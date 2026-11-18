@@ -287,7 +287,8 @@
     .robot-btn-row {
       display: flex; align-items: center; gap: 6px;
     }
-    .code-btn {
+    .code-btn { display: none !important; }
+    .code-btn-off {
       background: rgba(10,10,24,0.9); border: 1px solid #4a3060;
       border-radius: 6px; color: #b39ddb; font-size: 14px;
       width: 32px; height: 32px; cursor: pointer; flex-shrink: 0;
@@ -1276,7 +1277,11 @@ var LH = M.LINE_H, LW = M.LINE_W;
 
 // ── Renderer ──────────────────────────────────────────────────
 var vp = document.getElementById('viewport');
-var renderer = new THREE.WebGLRenderer({ antialias: true });
+var renderer;
+try { renderer = new THREE.WebGLRenderer({ antialias: true }); } catch (e) {
+  vp.innerHTML = '<div style="color:#ff8a80;padding:24px;font-family:monospace">Não foi possível iniciar o WebGL: ' + e.message + '<br>Ative a aceleração de hardware no navegador ou tente outro navegador.</div>';
+  throw e;
+}
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -4043,6 +4048,8 @@ function clampF(f) { return isNaN(+f) ? 1 : Math.max(0, Math.min(1, +f)); }
 
 // ── WebSocket runtime — C++ real + sensores ao vivo ──────────────
 var WS_URL = 'wss://sorosoccer.onrender.com';
+// Programação em C++ desativada (backend indisponível). Mude para true quando houver servidor.
+var PROGRAMMING_ENABLED = false;
 
 // ── Uma sessão WS por robô ────────────────────────────────────────
 // wsSession[i] = { ws, connected, running, robotIdx, serialBuf, delayTimer }
@@ -4060,6 +4067,7 @@ function makeSession(robotIdx) {
 }
 
 function wsConnectSession(sess, onReady) {
+  if (!PROGRAMMING_ENABLED) return;
   if (sess.ws && (sess.ws.readyState === WebSocket.OPEN || sess.ws.readyState === WebSocket.CONNECTING)) {
     if (sess.ws.readyState === WebSocket.OPEN && onReady) onReady();
     return;
@@ -4242,6 +4250,7 @@ var _runId = 0;
 
 // Roda apenas o robô do sidebar aberto (botão ▶ EXECUTAR)
 function runCode() {
+  if (!PROGRAMMING_ENABLED) { consoleLog('warn', 'Programação desativada por enquanto.'); return; }
   if (codeState.running) { consoleLog('warn', 'Já rodando. Pare primeiro.'); return; }
   if (codeState.robotIdx < 0) { consoleLog('err', 'Selecione um robô (botão 📄) antes de executar.'); return; }
   robotCodes[codeState.robotIdx] = document.getElementById('code-editor').value;
@@ -4330,7 +4339,7 @@ function toggleMainStart() {
 }
 
 // Conecta ao backend silenciosamente ao carregar
-setTimeout(function() {
+if (PROGRAMMING_ENABLED) setTimeout(function() {
   if (!wsSessions[0]) wsSessions[0] = makeSession(0);
   wsConnectSession(wsSessions[0], function() {
     consoleLog('ok', 'Conectado ao backend GCC. Pronto para compilar C++ real.');
